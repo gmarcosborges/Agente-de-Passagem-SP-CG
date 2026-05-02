@@ -2,7 +2,7 @@ from flight_search import search_one_way, build_purchase_link
 from filters import get_search_dates, filter_flights
 from notifier import send_telegram, format_alert
 
-PRICE_THRESHOLD = 500.00
+PRICE_THRESHOLD = 1500.00
 SP_AIRPORTS = ["CGH", "GRU"]
 DEST = "CGR"
 
