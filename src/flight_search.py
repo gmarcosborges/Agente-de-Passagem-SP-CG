@@ -14,64 +14,79 @@ def search_one_way(origin: str, destination: str, flight_date: date):
     )
     
     print(f"  Buscando {origin}→{destination} em {flight_date}...")
+    print(f"    URL: {url}")
     
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
-            page.goto(url, timeout=60000)
+            context = browser.new_context(
+                viewport={'width': 1920, 'height': 1080},
+                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            )
+            page = context.new_page()
             
-            # Espera a página carregar resultados (até 30s)
-            try:
-                page.wait_for_selector('[role="listitem"]', timeout=30000)
-            except PlaywrightTimeout:
-                print(f"    Timeout esperando resultados")
+            print(f"    Carregando página...")
+            page.goto(url, timeout=90000, wait_until='networkidle')
+            
+            # Aguarda 5 segundos pro JS renderizar
+            page.wait_for_timeout(5000)
+            
+            # Tenta vários seletores possíveis
+            selectors = [
+                '[role="listitem"]',
+                '.pIav2d',  # classe comum de card de voo
+                '[jsname]',  # elementos com atributo jsname
+            ]
+            
+            content_loaded = False
+            for selector in selectors:
+                try:
+                    page.wait_for_selector(selector, timeout=10000)
+                    print(f"    Encontrou elementos: {selector}")
+                    content_loaded = True
+                    break
+                except PlaywrightTimeout:
+                    continue
+            
+            if not content_loaded:
+                print(f"    Nenhum seletor funcionou. HTML da página:")
+                print(page.content()[:2000])  # Primeiros 2000 chars
                 browser.close()
                 return []
             
-            # Extrai voos da página
-            flights = []
-            items = page.query_selector_all('[role="listitem"]')
+            # Extrai texto da página inteira
+            page_text = page.inner_text('body')
             
-            for item in items[:10]:  # Limita aos 10 primeiros
+            # Procura por padrões de preço + horário no texto
+            # Exemplo: "R$ 450" ... "07:30 – 09:00" ... "Direto"
+            flights = []
+            
+            # Regex pra encontrar blocos de voo
+            # Formato: preço + horários + "Direto"
+            pattern = r'R\$\s*([\d.]+).*?(\d{1,2}:\d{2})\s*[–-]\s*(\d{1,2}:\d{2}).*?Direto'
+            matches = re.finditer(pattern, page_text, re.DOTALL | re.MULTILINE)
+            
+            for match in matches:
                 try:
-                    text = item.inner_text()
+                    price_str = match.group(1).replace(".", "")
+                    price = float(price_str)
+                    dep_str = match.group(2)
+                    arr_str = match.group(3)
                     
-                    # Verifica se é voo direto
-                    if "escala" in text.lower() or "conexão" in text.lower():
-                        continue
-                    if "Direto" not in text and "Nonstop" not in text:
-                        continue
-                    
-                    # Extrai horários (formato: "07:30 – 09:00")
-                    time_match = re.search(r'(\d{1,2}:\d{2})\s*–\s*(\d{1,2}:\d{2})', text)
-                    if not time_match:
-                        continue
-                    
-                    dep_str, arr_str = time_match.groups()
                     dep = datetime.strptime(dep_str, "%H:%M")
                     arr = datetime.strptime(arr_str, "%H:%M")
                     dep = datetime.combine(flight_date, dep.time(), tzinfo=BRT)
                     arr = datetime.combine(flight_date, arr.time(), tzinfo=BRT)
                     
-                    # Se chegada é antes da partida, assumir dia seguinte
                     if arr < dep:
                         arr = arr + timedelta(days=1)
                     
-                    # Extrai preço (formato: "R$ 450" ou "R$ 1.450")
-                    price_match = re.search(r'R\$\s*([\d.]+)', text)
-                    if not price_match:
-                        continue
-                    
-                    price_str = price_match.group(1).replace(".", "")
-                    price = float(price_str)
-                    
-                    # Extrai companhia aérea (geralmente primeira linha)
-                    airline = "Desconhecida"
-                    lines = text.split('\n')
-                    for line in lines:
-                        if any(x in line for x in ["LATAM", "GOL", "Azul", "Voepass"]):
-                            airline = line.strip()
+                    # Tenta extrair companhia
+                    airline = "Companhia aérea"
+                    chunk = page_text[max(0, match.start() - 100):match.start()]
+                    for name in ["LATAM", "GOL", "Azul", "Voepass"]:
+                        if name in chunk:
+                            airline = name
                             break
                     
                     flights.append({
@@ -86,9 +101,8 @@ def search_one_way(origin: str, destination: str, flight_date: date):
                         "destination": destination,
                         "date": flight_date,
                     })
-                    
                 except Exception as e:
-                    print(f"    Erro parseando item: {e}")
+                    print(f"    Erro parseando match: {e}")
                     continue
             
             browser.close()
