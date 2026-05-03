@@ -1,8 +1,8 @@
 from flight_search import search_one_way, build_purchase_link
-from filters import get_search_dates, filter_flights
+from filters import get_future_window_dates, filter_flights
 from notifier import send_telegram, format_alert
 
-PRICE_THRESHOLD = 5000.00
+PRICE_THRESHOLD = 800.00
 SP_AIRPORTS = ["CGH", "GRU"]
 DEST = "CGR"
 
@@ -36,8 +36,9 @@ def find_best_pair(out_date, ret_date):
     return None
 
 def main():
-    pairs = get_search_dates(weeks_ahead=2)
-    print(f"Verificando {len(pairs)} combinacoes de datas...")
+    # Busca passagens de 60 a 90 dias no futuro
+    pairs = get_future_window_dates(days_start=60, days_end=90)
+    print(f"Verificando {len(pairs)} combinacoes de datas (60-90 dias no futuro)...")
 
     alerts_sent = 0
     for out_date, ret_date in pairs:
@@ -48,9 +49,7 @@ def main():
             print(f"  {out_date} -> {ret_date}: R$ {result['total']:.2f} (acima do limite)")
             continue
 
-        link = build_purchase_link(
-            result["airport"], DEST, out_date, ret_date
-        )
+        link = build_purchase_link(result["airport"], DEST, out_date, ret_date)
         result["out"]["_link"] = link
         msg = format_alert(
             result["out"], result["ret"], result["total"],
@@ -61,6 +60,14 @@ def main():
         print(f"  Alerta enviado: {out_date} R$ {result['total']:.2f}")
 
     print(f"Execucao concluida. {alerts_sent} alerta(s) enviado(s).")
+    
+    # Log de uso da SerpAPI
+    searches_this_run = len(pairs) * 2
+    print(f"\n--- Uso da SerpAPI ---")
+    print(f"Buscas nesta execucao: {searches_this_run}")
+    print(f"Estimativa mensal (1x/dia): ~{searches_this_run * 30} buscas")
+    print(f"Limite gratis: 250 buscas/mes")
+    print(f"Verificar uso real em: https://serpapi.com/account")
 
 if __name__ == "__main__":
     main()
