@@ -4,3 +4,10 @@ __pycache__/
 .DS_Store
 venv/
 .venv/
+
+# Life Inbox - nada da sua vida entra no repositorio
+*.db
+*.sqlite3
+credentials.json
+token.json
+.life-inbox/
