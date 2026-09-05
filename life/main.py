@@ -105,7 +105,7 @@ def main():
     if args.stdout:
         print(mensagem)
     else:
-        telegram.enviar(mensagem)
+        telegram.enviar(mensagem, permitir_terminal=False)
 
     return 1 if falhas else 0
 

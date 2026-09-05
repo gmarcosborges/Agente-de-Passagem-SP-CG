@@ -8,8 +8,20 @@ def configurado():
     return bool(os.environ.get("TELEGRAM_BOT_TOKEN") and os.environ.get("TELEGRAM_CHAT_ID"))
 
 
-def enviar(mensagem):
+SEM_TELEGRAM = """
+Telegram nao configurado, e o briefing NAO vai ser impresso.
+
+Ele tem assunto de email dentro, e aqui isso viraria log gravado.
+Configure TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID, ou rode com --stdout
+se voce esta na sua maquina e quer ver na tela mesmo.
+"""
+
+
+def enviar(mensagem, permitir_terminal=False):
     if not configurado():
+        # Cair pro terminal so quando alguem pediu isso explicitamente.
+        if not permitir_terminal:
+            raise SystemExit(SEM_TELEGRAM)
         print("\n[Telegram nao configurado - mostrando aqui]\n")
         print(mensagem)
         return False
