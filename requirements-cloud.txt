@@ -1,0 +1,7 @@
+# Dependencias do job que roda na nuvem (IMAP + iCal).
+# Deliberadamente menor que requirements.txt: este processo segura a senha
+# do seu email, entao carrega o minimo de codigo de terceiro possivel.
+requests==2.32.3
+python-dateutil==2.9.0
+icalendar==6.1.0
+recurring-ical-events==3.3.3

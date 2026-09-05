@@ -1,0 +1,45 @@
+name: Life Inbox
+
+on:
+  schedule:
+    - cron: '0 10 * * *'   # 07:00 BRT, todo dia
+  workflow_dispatch:        # botao "Run workflow" pra testar na hora
+
+# O job so precisa ler o proprio codigo.
+permissions:
+  contents: read
+
+jobs:
+  briefing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Log de Actions em repositorio publico e visivel pra qualquer pessoa,
+      # e este job lida com o seu email. Melhor falhar do que vazar.
+      - name: Recusar rodar em repositorio publico
+        if: ${{ github.event.repository.private == false }}
+        run: |
+          echo "::error::Repositorio publico: logs sao publicos e este job le seu email."
+          echo "::error::Settings > General > Danger Zone > Change visibility > Private."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Instalar dependencias
+        run: pip install -r requirements-cloud.txt
+
+      # Sem --stdout de proposito: o briefing tem assunto de email dentro,
+      # e log de Actions fica gravado. Ele vai direto pro Telegram.
+      - name: Montar e enviar o briefing
+        env:
+          IMAP_USER: ${{ secrets.IMAP_USER }}
+          IMAP_PASSWORD: ${{ secrets.IMAP_PASSWORD }}
+          CALENDAR_ICS_URL: ${{ secrets.CALENDAR_ICS_URL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python -m life.main --sem-banco

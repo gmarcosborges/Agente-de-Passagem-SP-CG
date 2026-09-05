@@ -7,40 +7,51 @@ Roda uma vez por dia: coleta -> classifica -> guarda -> resume.
     python -m life.main --demo       # roda com dados falsos, sem tocar no Google
 """
 import argparse
+import os
 import sys
 import traceback
 
-from life import brief, store
+from life import brief, collectors, store
 from life.outputs import telegram
 
-COLETORES = {
-    "gmail": "life.collectors.gmail",
-    "gcalendar": "life.collectors.gcalendar",
-}
-
-
-def _importar(caminho):
-    modulo = __import__(caminho, fromlist=["coletar"])
-    return modulo.coletar
+# Traceback pode carregar pedaco de email; so aparece se voce pedir.
+DEBUG = os.environ.get("LIFE_DEBUG") == "1"
 
 
 def coletar_tudo(apenas=None):
     """Roda os coletores. Um coletor que falha nao derruba os outros."""
     eventos, falhas = [], []
-    for nome, caminho in COLETORES.items():
-        if apenas and nome not in apenas:
-            continue
+    escolhidos = collectors.disponiveis(apenas)
+    if not escolhidos:
+        raise SystemExit(SEM_CONFIG)
+
+    for nome, coletar in escolhidos:
         try:
-            novos = _importar(caminho)()
+            novos = coletar()
             print(f"  {nome}: {len(novos)} eventos", file=sys.stderr)
             eventos.extend(novos)
         except SystemExit:
             raise
         except Exception as e:
-            falhas.append(f"{nome}: {e}")
-            print(f"  {nome}: FALHOU - {e}", file=sys.stderr)
-            traceback.print_exc(file=sys.stderr)
+            falhas.append(f"{nome}: {type(e).__name__}")
+            print(f"  {nome}: FALHOU - {type(e).__name__}: {e}", file=sys.stderr)
+            if DEBUG:
+                traceback.print_exc(file=sys.stderr)
     return eventos, falhas
+
+
+SEM_CONFIG = """
+Nenhuma fonte configurada.
+
+Na nuvem (sem computador ligado), no .env ou nos secrets:
+  IMAP_USER / IMAP_PASSWORD   senha de app do Google
+  CALENDAR_ICS_URL            endereco secreto em formato iCal
+
+Na sua maquina, como alternativa:
+  ~/.life-inbox/credentials.json   credencial OAuth somente leitura
+
+Detalhes em docs/life-inbox.md
+"""
 
 
 def eventos_demo():
