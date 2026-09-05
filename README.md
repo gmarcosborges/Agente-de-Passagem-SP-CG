@@ -16,6 +16,7 @@ python -m life.main --demo --stdout    # vê o formato, sem tocar em nada seu
 ```
 
 Setup completo em **[docs/life-inbox.md](docs/life-inbox.md)**.
+Segurança explicada sem jargão em **[docs/seguranca.md](docs/seguranca.md)**.
 Secrets: `IMAP_USER`, `IMAP_PASSWORD`, `CALENDAR_ICS_URL`, `TELEGRAM_BOT_TOKEN`,
 `TELEGRAM_CHAT_ID`.
 

@@ -14,13 +14,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      # Log de Actions em repositorio publico e visivel pra qualquer pessoa,
-      # e este job lida com o seu email. Melhor falhar do que vazar.
-      - name: Recusar rodar em repositorio publico
-        if: ${{ github.event.repository.private == false }}
+      # Este job le o seu email. Antes de qualquer coisa, ele confere se o
+      # lugar onde esta rodando e seguro - e se nao for, nao roda. Falha
+      # fechado: na duvida, recusa.
+      - name: Conferir se e seguro rodar aqui
+        if: ${{ github.event.repository.private == false || github.event.repository.fork == true }}
         run: |
-          echo "::error::Repositorio publico: logs sao publicos e este job le seu email."
-          echo "::error::Settings > General > Danger Zone > Change visibility > Private."
+          echo "::error::Recusando rodar: este repositorio nao esta privado, ou e uma copia."
+          echo "::error::Em repositorio publico o log fica visivel pra qualquer pessoa."
+          echo "::error::Conserto: Settings > General > Danger Zone > Change visibility > Private."
           exit 1
 
       - uses: actions/checkout@v4
