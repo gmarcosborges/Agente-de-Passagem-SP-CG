@@ -6,8 +6,12 @@ from dateutil import tz
 BRT = tz.gettz("America/Sao_Paulo")
 SERPAPI_BASE = "https://serpapi.com/search.json"
 
-def search_one_way(origin: str, destination: str, flight_date: date):
-    """Busca voos via SerpAPI Google Flights."""
+def search_one_way(origin: str, destination: str, flight_date: date, apenas_diretos: bool = True):
+    """Busca voos via SerpAPI Google Flights.
+
+    apenas_diretos=False aceita ate uma conexao: o Gabriel pediu a mais
+    barata, sem preferencia de companhia nem de trecho.
+    """
     api_key = os.environ["SERPAPI_KEY"]
     
     print(f"  Buscando {origin}→{destination} em {flight_date}...")
@@ -40,14 +44,18 @@ def search_one_way(origin: str, destination: str, flight_date: date):
     flights = []
     for offer in best_flights:
         try:
-            # Pega primeiro segmento (voo direto tem só 1)
-            if not offer.get("flights") or len(offer["flights"]) != 1:
-                continue  # Pula voos com conexão
-            
-            flight_seg = offer["flights"][0]
-            
-            dep_airport = flight_seg["departure_airport"]
-            arr_airport = flight_seg["arrival_airport"]
+            segmentos = offer.get("flights") or []
+            if not segmentos:
+                continue
+            if apenas_diretos and len(segmentos) != 1:
+                continue
+            if len(segmentos) > 2:
+                continue  # duas conexoes ja nao vale a pena
+
+            # Sai no primeiro segmento, chega no ultimo.
+            flight_seg = segmentos[0]
+            dep_airport = segmentos[0]["departure_airport"]
+            arr_airport = segmentos[-1]["arrival_airport"]
             
             # Parse timestamps
             dep = datetime.strptime(dep_airport["time"], "%Y-%m-%d %H:%M")
@@ -63,8 +71,8 @@ def search_one_way(origin: str, destination: str, flight_date: date):
                 "departure": dep,
                 "arrival": arr,
                 "duration": f"{flight_seg.get('duration', 0)} min",
-                "stops": 0,
-                "is_direct": True,
+                "stops": len(segmentos) - 1,
+                "is_direct": len(segmentos) == 1,
                 "price_brl": price,
                 "origin": origin,
                 "destination": destination,

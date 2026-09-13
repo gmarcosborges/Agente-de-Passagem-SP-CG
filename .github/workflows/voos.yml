@@ -1,0 +1,42 @@
+name: Voos SP - Campo Grande
+
+on:
+  schedule:
+    - cron: '0 9 * * *'   # 06:00 BRT, uma hora antes do briefing das 7h
+  workflow_dispatch:
+
+# Precisa escrever porque commita o data/voos.json que o Life Inbox le.
+permissions:
+  contents: write
+
+jobs:
+  buscar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Buscar voos
+        env:
+          SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
+        run: cd src && python trip_finder.py
+
+      - name: Publicar resultado
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/voos.json
+          if git diff --staged --quiet; then
+            echo "Precos iguais aos de ontem, nada a commitar."
+          else
+            git commit -m "Atualiza precos SP - Campo Grande [skip ci]"
+            git push
+          fi
